@@ -101,12 +101,56 @@ const injectFonts = () => {
 
 const GLOBAL_CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
-html { scroll-behavior: smooth; overscroll-behavior: none; }
-body { background: #00010a; color: #f0f4ff; font-family: 'Sora', system-ui, sans-serif; overflow-x: hidden; }
-::-webkit-scrollbar { width: 3px; }
-::-webkit-scrollbar-track { background: #010212; }
-::-webkit-scrollbar-thumb { background: linear-gradient(#00c8c8, #7c3aed); border-radius: 4px; }
+  html { scroll-behavior: smooth; overscroll-behavior: none; height: 100%; }
+  body { background: #00010a; color: #f0f4ff; font-family: 'Sora', system-ui, sans-serif; overflow-x: hidden; min-height: 100%; width: 100%; }
+  
+  /* Global scrollbar - responsive */
+  ::-webkit-scrollbar { width: 6px; height: 8px; }
+  @media (max-width: 768px) {
+    ::-webkit-scrollbar { width: 4px; height: 6px; }
+  }
+  ::-webkit-scrollbar-track { background: #010212; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(90deg, #00c8c8, #7c3aed); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:horizontal { background: linear-gradient(90deg, #00c8c8, #7c3aed); }
+  ::-webkit-scrollbar-thumb:vertical { background: linear-gradient(180deg, #00c8c8, #7c3aed); }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Video Page specific scrollbar fixes */
+  .video-page-active {
+    overflow: hidden !important;
+    touch-action: pan-y;
+  }
+  .video-page-active .video-player-container {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    overscroll-behavior-y: contain;
+  }
+
+  /* FULL WIDTH SCROLLBAR ONLY FOR VIDEO PAGE */
+  .video-player-container::-webkit-scrollbar { width: 100%; height: 12px; }
+  .video-player-container::-webkit-scrollbar-track { 
+    background: #010212; 
+    margin: 0;
+    border-radius: 0;
+  }
+  .video-player-container::-webkit-scrollbar-thumb { 
+    background: linear-gradient(90deg, #00c8c8, #7c3aed); 
+    border-radius: 0;
+    width: 100%;
+  }
+  .video-player-container::-webkit-scrollbar-thumb:horizontal { 
+    background: linear-gradient(90deg, #00c8c8, #7c3aed);
+  }
+  @media (max-width: 768px) {
+    .video-player-container::-webkit-scrollbar { height: 8px; }
+  }
+  .video-player-container {
+    scrollbar-width: auto;
+    scrollbar-color: #00c8c8 #010212;
+  }
 ::selection { background: rgba(0,200,200,0.22); color: #00e5e5; }
 
 @keyframes shimmerText {
@@ -1563,9 +1607,15 @@ function VideoPlayer({ video, allVideos, onClose }) {
   );
 
   const nextVideo = allVideos[(currentVideoIndex + 1) % allVideos.length];
+  
+  // Apply video page scrollbar fixes
+  useEffect(() => {
+    document.body.classList.add('video-page-active');
+    return () => document.body.classList.remove('video-page-active');
+  }, []);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 2000, display: "flex" }}>
+    <div className="video-player-container" style={{ position: "fixed", inset: 0, background: "#000", zIndex: 2000, display: "flex" }}>
       <div ref={containerRef} onMouseMove={showControlsTemp}
         onMouseLeave={() => { if (playingRef.current) setControlsVisible(false); }}
         style={{ position: "relative", flex: 1, background: "#000", cursor: controlsVisible ? "default" : "none", overflow: "hidden" }}
