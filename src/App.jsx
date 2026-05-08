@@ -101,10 +101,9 @@ const injectFonts = () => {
 
 const GLOBAL_CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; overscroll-behavior: none; height: 100%; }
+  html { scroll-behavior: smooth; overscroll-behavior-y: auto; height: 100%; }
   body { background: #00010a; color: #f0f4ff; font-family: 'Sora', system-ui, sans-serif; overflow-x: hidden; min-height: 100%; width: 100%; }
   
-  /* Global scrollbar - responsive */
   ::-webkit-scrollbar { width: 6px; height: 8px; }
   @media (max-width: 768px) {
     ::-webkit-scrollbar { width: 4px; height: 6px; }
@@ -115,10 +114,16 @@ const GLOBAL_CSS = `
   ::-webkit-scrollbar-thumb:vertical { background: linear-gradient(180deg, #00c8c8, #7c3aed); }
   ::-webkit-scrollbar-corner { background: transparent; }
 
-  /* Video Page specific scrollbar fixes */
+  /* ── SIDE PANEL SCROLLBAR (Desktop "More Like This") ── */
+  .side-panel-scroll { scrollbar-width: thin; scrollbar-color: #00c8c8 rgba(0,1,14,0.5); }
+  .side-panel-scroll::-webkit-scrollbar { width: 5px; }
+  .side-panel-scroll::-webkit-scrollbar-track { background: rgba(0,1,14,0.5); border-radius: 4px; }
+  .side-panel-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #00c8c8, #7c3aed); border-radius: 4px; }
+  .side-panel-scroll::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg, #00e5e5, #a78bfa); }
+
   .video-page-active {
     overflow: hidden !important;
-    touch-action: pan-y;
+    touch-action: manipulation;
   }
   .video-page-active .video-player-container {
     height: 100dvh !important;
@@ -129,7 +134,6 @@ const GLOBAL_CSS = `
     overscroll-behavior-y: contain;
   }
 
-  /* FULL WIDTH SCROLLBAR ONLY FOR VIDEO PAGE */
   .video-player-container::-webkit-scrollbar { width: 100%; height: 12px; }
   .video-player-container::-webkit-scrollbar-track { 
     background: #010212; 
@@ -151,6 +155,13 @@ const GLOBAL_CSS = `
     scrollbar-width: auto;
     scrollbar-color: #00c8c8 #010212;
   }
+
+  /* Mobile up-next list scrollbar */
+  .mobile-upnext-scroll { scrollbar-width: thin; scrollbar-color: #7c3aed rgba(0,0,0,0.3); }
+  .mobile-upnext-scroll::-webkit-scrollbar { width: 4px; }
+  .mobile-upnext-scroll::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  .mobile-upnext-scroll::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #7c3aed, #00c8c8); border-radius: 4px; }
+
 ::selection { background: rgba(0,200,200,0.22); color: #00e5e5; }
 
 @keyframes shimmerText {
@@ -228,7 +239,6 @@ const GLOBAL_CSS = `
   100% { opacity:1; letter-spacing: 0.08em; filter: blur(0); }
 }
 
-/* ── PREMIUM INTRO ANIMATIONS ── */
 @keyframes introFadeOut {
   from { opacity:1; pointer-events:all; }
   to   { opacity:0; pointer-events:none; }
@@ -321,6 +331,10 @@ const GLOBAL_CSS = `
   0%   { clip-path: inset(0 0 0 0); opacity: 1; }
   100% { clip-path: inset(0 0 0 100%); opacity: 0; }
 }
+@keyframes mobileBarPulse {
+  0%,100% { transform: scaleY(0.4); }
+  50%      { transform: scaleY(1); }
+}
 
 .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
@@ -343,7 +357,7 @@ const VIDEO_URLS = [
 ];
 const getUrl = i => VIDEO_URLS[i % VIDEO_URLS.length];
 
-const ALL_VIDEOS = [// Changed videoUrl for id:1 to match the actual URL in VIDEO_URLS
+const ALL_VIDEOS = [
   { id:1, title:"Big Buck Bunny", genre:"Animation", type:"Movie", language:"English", rating:"PG", duration:"9 min", year:2008, description:"A large, soft-hearted bunny exacts sweet revenge on woodland bullies in this beloved open-source classic.", cast:["Blender Foundation"], thumbnail:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg", banner:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/800px-Big_buck_bunny_poster_big.jpg", videoUrl:getUrl(0), categories:["trending","animation","comedy"], featured:true },
   { id:2, title:"Elephant Dream", genre:"Sci-Fi", type:"Short", language:"English", rating:"PG", duration:"11 min", year:2006, description:"Two men navigate a dreamlike mechanical world full of surreal wonder and hidden meaning.", cast:["Blender Foundation"], thumbnail:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Elephants_Dream_s5_both.jpg/800px-Elephants_Dream_s5_both.jpg", banner:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Elephants_Dream_s5_both.jpg/800px-Elephants_Dream_s5_both.jpg", videoUrl:getUrl(1), categories:["trending","originals","sci-fi"] },
   { id:3, title:"Cosmic Frontier", genre:"Sci-Fi", type:"Series", language:"English", rating:"PG-13", duration:"42 min", year:2025, description:"A crew of intergalactic explorers discovers ancient alien civilizations on the edge of known space.", cast:["Zoe Miller","Jake Harrison"], thumbnail:"https://picsum.photos/seed/cosmic99/400/600", banner:"https://picsum.photos/seed/cosmic99/1400/700", videoUrl:getUrl(2), categories:["trending","sci-fi","top-rated","originals"] },
@@ -411,36 +425,33 @@ function useWindowSize() {
 }
 
 /* ══════════════════════════════════════════════
-   PREMIUM CINEMATIC INTRO — NO BALLOONS
-   7 phases: void → grid scan → holo-rings → 
-   glitch-assemble → data-readout → flare-burst → wipe-exit
+   PREMIUM CINEMATIC INTRO
 ══════════════════════════════════════════════ */
 function IntroAnimation({ onDone }) {
   const canvasRef = useRef();
   const [phase, setPhase] = useState(0);
   const [glitchTick, setGlitchTick] = useState(0);
+  const { w } = useWindowSize();
 
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 150),   // grid fades in
-      setTimeout(() => setPhase(2), 700),   // holo rings
-      setTimeout(() => setPhase(3), 1350),  // letters assemble
-      setTimeout(() => setPhase(4), 2400),  // data readout
-      setTimeout(() => setPhase(5), 3200),  // flare burst
-      setTimeout(() => setPhase(6), 4100),  // wipe out begins
+      setTimeout(() => setPhase(1), 150),
+      setTimeout(() => setPhase(2), 700),
+      setTimeout(() => setPhase(3), 1350),
+      setTimeout(() => setPhase(4), 2400),
+      setTimeout(() => setPhase(5), 3200),
+      setTimeout(() => setPhase(6), 4100),
       setTimeout(() => onDone(), 5000),
     ];
     return () => timers.forEach(clearTimeout);
   }, [onDone]);
 
-  // Glitch tick for letter animation
   useEffect(() => {
     if (phase < 3) return;
     const iv = setInterval(() => setGlitchTick(t => t + 1), 2800);
     return () => clearInterval(iv);
   }, [phase]);
 
-  /* ── Particle canvas ── */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -450,7 +461,6 @@ function IntroAnimation({ onDone }) {
     const onResize = () => { W = window.innerWidth; H = window.innerHeight; canvas.width = W; canvas.height = H; };
     window.addEventListener("resize", onResize);
 
-    // Starfield + energy particles
     const stars = Array.from({ length: 280 }, () => ({
       x: Math.random() * W, y: Math.random() * H,
       r: Math.random() * 1.2 + 0.1,
@@ -458,7 +468,6 @@ function IntroAnimation({ onDone }) {
       hue: [185, 195, 210, 270, 240][Math.floor(Math.random() * 5)],
     }));
 
-    // Energy streams — horizontal
     const streams = Array.from({ length: 12 }, (_, i) => ({
       y: (H / 12) * i + Math.random() * 30,
       x: -200 - Math.random() * 400,
@@ -474,7 +483,6 @@ function IntroAnimation({ onDone }) {
       ctx.fillStyle = "rgba(0,1,10,0.13)";
       ctx.fillRect(0, 0, W, H);
 
-      // Stars
       stars.forEach(s => {
         s.a = Math.max(0.05, Math.min(1, s.a + s.da));
         if (s.a <= 0.05 || s.a >= 1) s.da *= -1;
@@ -482,7 +490,6 @@ function IntroAnimation({ onDone }) {
         ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
       });
 
-      // Energy streams
       streams.forEach(st => {
         st.x += st.speed;
         if (st.x > W + 300) st.x = -300 - Math.random() * 200;
@@ -495,7 +502,6 @@ function IntroAnimation({ onDone }) {
         ctx.beginPath(); ctx.moveTo(st.x, st.y); ctx.lineTo(st.x + st.len, st.y); ctx.stroke();
       });
 
-      // Central aurora glow — only once rings appear
       if (frame > 30) {
         const t = frame * 0.012;
         const cx = W / 2, cy = H / 2;
@@ -516,16 +522,17 @@ function IntroAnimation({ onDone }) {
   const BRAND = "STREAMIFY";
   const LETTER_ACCENT = { 0: "#00e5e5", 6: "#93c5fd", 8: "#a78bfa" };
 
-  // Corner bracket decorations
   const CornerBracket = ({ pos }) => {
     const isTop = pos.includes("top");
     const isLeft = pos.includes("left");
+    const offset = w < 480 ? 12 : 28;
     return (
       <div style={{
         position: "absolute",
-        [isTop ? "top" : "bottom"]: 28,
-        [isLeft ? "left" : "right"]: 28,
-        width: 40, height: 40,
+        [isTop ? "top" : "bottom"]: offset,
+        [isLeft ? "left" : "right"]: offset,
+        width: w < 480 ? 24 : 40, 
+        height: w < 480 ? 24 : 40,
         opacity: phase >= 2 ? 1 : 0,
         transition: "opacity 0.6s ease",
         animation: phase >= 2 ? `introCornerIn 0.5s ${isTop ? "0.1s" : "0.25s"} ease both` : "none",
@@ -557,21 +564,13 @@ function IntroAnimation({ onDone }) {
       zIndex: 9999, overflow: "hidden",
       animation: phase === 6 ? "introFadeOut 0.9s 0.1s cubic-bezier(0.4,0,1,1) forwards" : "none",
     }}>
-      {/* Particle canvas */}
       <canvas ref={canvasRef} style={{ position: "absolute", inset: 0, zIndex: 1 }} />
 
-      {/* Perspective grid floor */}
       <div style={{
         position: "absolute", inset: 0, zIndex: 2, pointerEvents: "none",
         opacity: phase >= 1 ? 1 : 0, transition: "opacity 1.2s ease",
-        background: `
-          radial-gradient(ellipse 120% 60% at 50% 110%,
-            rgba(0,200,200,0.06) 0%,
-            rgba(124,58,237,0.03) 40%,
-            transparent 70%)
-        `,
+        background: `radial-gradient(ellipse 120% 60% at 50% 110%, rgba(0,200,200,0.06) 0%, rgba(124,58,237,0.03) 40%, transparent 70%)`,
       }}>
-        {/* Grid lines - horizontal perspective */}
         <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.18 }} viewBox="0 0 1440 900" preserveAspectRatio="none">
           {Array.from({ length: 14 }, (_, i) => {
             const y = 500 + i * 28;
@@ -585,7 +584,6 @@ function IntroAnimation({ onDone }) {
         </svg>
       </div>
 
-      {/* Horizontal scan line */}
       {phase >= 1 && (
         <div style={{
           position: "absolute", left: 0, right: 0, height: 1.5, zIndex: 4,
@@ -596,7 +594,6 @@ function IntroAnimation({ onDone }) {
         }} />
       )}
 
-      {/* Vertical scan line */}
       {phase >= 1 && (
         <div style={{
           position: "absolute", top: 0, bottom: 0, width: 1.5, zIndex: 4,
@@ -607,7 +604,6 @@ function IntroAnimation({ onDone }) {
         }} />
       )}
 
-      {/* Holographic rings */}
       {phase >= 2 && [0, 1, 2, 3].map(i => (
         <div key={i} style={{
           position: "absolute", zIndex: 3, borderRadius: "50%",
@@ -616,7 +612,6 @@ function IntroAnimation({ onDone }) {
           animation: `${i % 2 === 0 ? "orbitRing" : "counterOrbit"} ${18 + i * 5}s linear infinite`,
           opacity: phase >= 2 ? 1 : 0, transition: "opacity 0.6s ease",
         }}>
-          {/* Orbiting node */}
           <div style={{
             position: "absolute",
             top: i === 0 ? -5 : i === 1 ? "auto" : -4,
@@ -630,22 +625,20 @@ function IntroAnimation({ onDone }) {
         </div>
       ))}
 
-      {/* Corner brackets */}
       <CornerBracket pos="top-left" />
       <CornerBracket pos="top-right" />
       <CornerBracket pos="bottom-left" />
       <CornerBracket pos="bottom-right" />
 
-      {/* Signal bars — left side */}
       {phase >= 2 && (
-        <div style={{
-          position: "absolute", left: 40, top: "50%", transform: "translateY(-50%)",
+        <div style={{ 
+          position: "absolute", left: w < 480 ? 10 : 40, top: "50%", transform: "translateY(-50%)",
           zIndex: 5, display: "flex", flexDirection: "column", gap: 6,
           opacity: phase >= 2 ? 1 : 0, transition: "opacity 0.6s 0.4s",
         }}>
           {[0.8, 1, 0.6, 0.9, 0.5].map((a, i) => (
             <div key={i} style={{
-              width: 24 + i * 4, height: 2,
+              width: (w < 480 ? 14 : 24) + i * 4, height: 2,
               background: `rgba(0,200,200,${a})`,
               borderRadius: 2,
               boxShadow: `0 0 6px rgba(0,200,200,${a})`,
@@ -655,16 +648,15 @@ function IntroAnimation({ onDone }) {
         </div>
       )}
 
-      {/* Signal bars — right side */}
       {phase >= 2 && (
         <div style={{
-          position: "absolute", right: 40, top: "50%", transform: "translateY(-50%)",
+          position: "absolute", right: w < 480 ? 10 : 40, top: "50%", transform: "translateY(-50%)",
           zIndex: 5, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end",
           opacity: phase >= 2 ? 1 : 0, transition: "opacity 0.6s 0.4s",
         }}>
           {[0.5, 0.9, 0.6, 1, 0.7].map((a, i) => (
             <div key={i} style={{
-              width: 24 + (4-i) * 4, height: 2,
+              width: (w < 480 ? 14 : 24) + (4-i) * 4, height: 2,
               background: `rgba(124,58,237,${a})`,
               borderRadius: 2,
               boxShadow: `0 0 6px rgba(124,58,237,${a})`,
@@ -674,7 +666,6 @@ function IntroAnimation({ onDone }) {
         </div>
       )}
 
-      {/* Status badge */}
       <div style={{
         position: "absolute", top: "18%", left: "50%", transform: "translateX(-50%)",
         zIndex: 6, whiteSpace: "nowrap",
@@ -685,7 +676,7 @@ function IntroAnimation({ onDone }) {
           display: "inline-flex", alignItems: "center", gap: 10,
           background: "rgba(0,200,200,0.04)",
           border: "1px solid rgba(0,200,200,0.22)",
-          borderRadius: 3, padding: "7px 22px",
+          borderRadius: 3, padding: w < 480 ? "5px 12px" : "7px 22px",
           backdropFilter: "blur(16px)",
         }}>
           <div style={{
@@ -694,8 +685,8 @@ function IntroAnimation({ onDone }) {
             animation: "introSignalPulse 1.6s ease-in-out infinite",
           }} />
           <span style={{
-            fontFamily: F_ACCENT, fontSize: 7.5, fontWeight: 700,
-            letterSpacing: 5.5, color: "#00a0a0", textTransform: "uppercase",
+            fontFamily: F_ACCENT, fontSize: w < 480 ? 6.5 : 7.5, fontWeight: 700,
+            letterSpacing: w < 480 ? 2 : 5.5, color: "#00a0a0", textTransform: "uppercase",
           }}>ULTRA PREMIUM STREAMING</span>
           <div style={{
             width: 5, height: 5, borderRadius: "50%", background: "#a78bfa",
@@ -705,26 +696,24 @@ function IntroAnimation({ onDone }) {
         </div>
       </div>
 
-      {/* Main brand letters — glitch assemble */}
       <div style={{
         position: "relative", zIndex: 6, textAlign: "center",
         display: "flex", flexDirection: "column", alignItems: "center",
       }}>
         <div style={{
           display: "flex", alignItems: "baseline", justifyContent: "center",
-          gap: 1, marginBottom: 6, position: "relative",
+          gap: w < 480 ? 0 : 1, marginBottom: 6, position: "relative",
         }}>
           {BRAND.split("").map((ch, i) => (
             <span key={i} style={{
               fontFamily: F_ACCENT,
-              fontSize: i === 0 ? "clamp(52px,10vw,128px)" : "clamp(30px,5.8vw,76px)",
+              fontSize: i === 0 ? "clamp(42px,10vw,128px)" : "clamp(22px,5.8vw,76px)",
               fontWeight: 900,
               color: LETTER_ACCENT[i] || "#f0f4ff",
               display: "inline-block",
               opacity: phase >= 3 ? 1 : 0,
               transform: phase >= 3 ? "translateY(0) skewX(0)" : "translateY(50px) skewX(-8deg)",
-              transition: `opacity 0.7s ${0.05 + i * 0.065}s cubic-bezier(0.22,1,0.36,1),
-                           transform 0.7s ${0.05 + i * 0.065}s cubic-bezier(0.22,1,0.36,1)`,
+              transition: `opacity 0.7s ${0.05 + i * 0.065}s cubic-bezier(0.22,1,0.36,1), transform 0.7s ${0.05 + i * 0.065}s cubic-bezier(0.22,1,0.36,1)`,
               filter: phase >= 3 ? "none" : "blur(10px)",
               textShadow: i === 0
                 ? `0 0 40px #00e5e5, 0 0 100px rgba(0,228,228,0.35), 0 2px 0 rgba(0,0,0,0.9)`
@@ -734,26 +723,19 @@ function IntroAnimation({ onDone }) {
               animation: phase >= 3 && glitchTick > 0 ? `introGlitchH 0.5s ${i * 0.03}s ease, introGlitchColor 0.5s ${i * 0.03}s ease` : "none",
             }}>{ch}</span>
           ))}
-
-          {/* Glitch ghost layer */}
           {phase >= 3 && (
-            <div style={{
-              position: "absolute", inset: 0, display: "flex", alignItems: "baseline", justifyContent: "center", gap: 1,
+            <div style={{ 
+              position: "absolute", inset: 0, display: "flex", alignItems: "baseline", justifyContent: "center", gap: w < 480 ? 0 : 1,
               opacity: 0.12, pointerEvents: "none", transform: "translate(3px, 0)",
               color: "#ff0080", mixBlendMode: "screen",
             }}>
-              {BRAND.split("").map((ch, i) => (
-                <span key={i} style={{
-                  fontFamily: F_ACCENT,
-                  fontSize: i === 0 ? "clamp(52px,10vw,128px)" : "clamp(30px,5.8vw,76px)",
-                  fontWeight: 900,
-                }}>{ch}</span>
+              {BRAND.split("").map((ch, i) => ( 
+                <span key={i} style={{ fontFamily: F_ACCENT, fontSize: i === 0 ? "clamp(42px,10vw,128px)" : "clamp(22px,5.8vw,76px)", fontWeight: 900 }}>{ch}</span>
               ))}
             </div>
           )}
         </div>
 
-        {/* Animated divider */}
         <div style={{ position: "relative", width: "100%", height: 2, margin: "10px 0 14px", overflow: "hidden" }}>
           <div style={{
             height: "100%",
@@ -772,7 +754,6 @@ function IntroAnimation({ onDone }) {
           )}
         </div>
 
-        {/* Tagline */}
         <p style={{
           fontFamily: F_DISPLAY, fontStyle: "italic",
           fontSize: "clamp(9px,1.1vw,13px)", letterSpacing: "0.5em",
@@ -784,7 +765,6 @@ function IntroAnimation({ onDone }) {
           opacity: phase >= 4 ? 1 : 0, transition: "opacity 0.5s 0.3s",
         }}>Beyond · Cinema · Redefined</p>
 
-        {/* Data readout row */}
         <div style={{
           display: "flex", gap: 0, alignItems: "center", justifyContent: "center",
           opacity: phase >= 4 ? 1 : 0,
@@ -792,103 +772,45 @@ function IntroAnimation({ onDone }) {
           marginBottom: 28,
         }}>
           {[
-            { label: "4K ULTRA HD", col: "#00a0a0" },
+            { label: w < 480 ? "4K" : "4K ULTRA HD", col: "#00a0a0" },
             { label: "DOLBY ATMOS", col: "#7c3aed" },
             { label: "HDR10+", col: "#3b82f6" },
             { label: "IMAX ENHANCED", col: "#00a0a0" },
           ].map((item, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              {i > 0 && (
-                <span style={{ margin: "0 14px", width: 1, height: 12, background: "rgba(0,200,200,0.18)", display: "inline-block" }} />
-              )}
-              <span style={{
-                fontFamily: F_ACCENT, fontSize: 7.5, fontWeight: 700,
-                letterSpacing: 2.5, color: item.col,
-                animation: `introSignalPulse ${2 + i * 0.3}s ease-in-out ${i * 0.15}s infinite`,
-              }}>{item.label}</span>
+              {i > 0 && <span style={{ margin: w < 480 ? "0 8px" : "0 14px", width: 1, height: 12, background: "rgba(0,200,200,0.18)", display: "inline-block" }} />}
+              <span style={{ fontFamily: F_ACCENT, fontSize: 7.5, fontWeight: 700, letterSpacing: 2.5, color: item.col, animation: `introSignalPulse ${2 + i * 0.3}s ease-in-out ${i * 0.15}s infinite` }}>{item.label}</span>
             </span>
           ))}
         </div>
 
-        {/* Progress bar */}
-        <div style={{
-          width: "clamp(180px,26vw,300px)", height: 1.5,
-          background: "rgba(0,200,200,0.07)", borderRadius: 2,
-          overflow: "hidden", position: "relative",
-          opacity: phase >= 4 ? 1 : 0, transition: "opacity 0.4s 0.5s",
-        }}>
-          <div style={{
-            height: "100%",
-            background: `linear-gradient(to right, #00c8c8, #a78bfa, #3b82f6)`,
-            animation: phase >= 4 ? "introProgressFill 1.8s 0.5s cubic-bezier(0.4,0,0.2,1) both" : "none",
-            boxShadow: "0 0 10px #00c8c8",
-          }} />
-          <div style={{
-            position: "absolute", top: 0, left: 0, width: "30%", height: "100%",
-            background: "linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent)",
-            animation: phase >= 4 ? "shimmerBar 1.2s ease-in-out 0.7s infinite" : "none",
-          }} />
+        <div style={{ width: "clamp(180px,26vw,300px)", height: 1.5, background: "rgba(0,200,200,0.07)", borderRadius: 2, overflow: "hidden", position: "relative", opacity: phase >= 4 ? 1 : 0, transition: "opacity 0.4s 0.5s" }}>
+          <div style={{ height: "100%", background: `linear-gradient(to right, #00c8c8, #a78bfa, #3b82f6)`, animation: phase >= 4 ? "introProgressFill 1.8s 0.5s cubic-bezier(0.4,0,0.2,1) both" : "none", boxShadow: "0 0 10px #00c8c8" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, width: "30%", height: "100%", background: "linear-gradient(to right, transparent, rgba(255,255,255,0.8), transparent)", animation: phase >= 4 ? "shimmerBar 1.2s ease-in-out 0.7s infinite" : "none" }} />
         </div>
 
-        {/* Dot indicators */}
-        <div style={{
-          marginTop: 16, display: "flex", gap: 8, justifyContent: "center",
-          opacity: phase >= 4 ? 1 : 0, transition: "opacity 0.4s 0.7s",
-        }}>
+        <div style={{ marginTop: 16, display: "flex", gap: 8, justifyContent: "center", opacity: phase >= 4 ? 1 : 0, transition: "opacity 0.4s 0.7s" }}>
           {["#4c1d95","#6d28d9","#00e5e5","#6d28d9","#4c1d95"].map((col, i) => (
-            <div key={i} style={{
-              width: i === 2 ? 22 : 5, height: 5,
-              background: i === 2 ? `linear-gradient(to right, #00c8c8, #7c3aed)` : col,
-              borderRadius: 3,
-              boxShadow: i === 2 ? "0 0 12px #00c8c8" : "none",
-              opacity: i === 2 ? 1 : 0.35,
-            }} />
+            <div key={i} style={{ width: i === 2 ? 22 : 5, height: 5, background: i === 2 ? `linear-gradient(to right, #00c8c8, #7c3aed)` : col, borderRadius: 3, boxShadow: i === 2 ? "0 0 12px #00c8c8" : "none", opacity: i === 2 ? 1 : 0.35 }} />
           ))}
         </div>
       </div>
 
-      {/* Flare burst on phase 5 */}
       {phase >= 5 && (
         <>
-          <div style={{
-            position: "absolute", inset: 0, zIndex: 7, pointerEvents: "none",
-            background: "radial-gradient(ellipse at center, rgba(0,228,228,0.12) 0%, rgba(124,58,237,0.06) 35%, transparent 70%)",
-            animation: "introPulseRing 1.2s ease-out forwards",
-          }} />
+          <div style={{ position: "absolute", inset: 0, zIndex: 7, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(0,228,228,0.12) 0%, rgba(124,58,237,0.06) 35%, transparent 70%)", animation: "introPulseRing 1.2s ease-out forwards" }} />
           {[0, 1, 2, 3].map(i => (
-            <div key={i} style={{
-              position: "absolute", left: "50%", top: "50%",
-              transform: "translate(-50%,-50%)",
-              width: 200 + i * 150, height: 200 + i * 150,
-              borderRadius: "50%",
-              border: `1px solid rgba(${i % 2 === 0 ? "0,228,228" : "124,58,237"},${0.4 - i * 0.08})`,
-              animation: `introPulseRing ${0.9 + i * 0.25}s ${i * 0.1}s ease-out forwards`,
-              pointerEvents: "none", zIndex: 7,
-            }} />
+            <div key={i} style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 200 + i * 150, height: 200 + i * 150, borderRadius: "50%", border: `1px solid rgba(${i % 2 === 0 ? "0,228,228" : "124,58,237"},${0.4 - i * 0.08})`, animation: `introPulseRing ${0.9 + i * 0.25}s ${i * 0.1}s ease-out forwards`, pointerEvents: "none", zIndex: 7 }} />
           ))}
         </>
       )}
 
-      {/* Bottom system info */}
       {phase >= 4 && (
-        <div style={{
-          position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)",
-          zIndex: 6, display: "flex", gap: 32, alignItems: "center",
-          opacity: 0, animation: "introDataIn 0.6s 0.8s ease forwards",
-          whiteSpace: "nowrap",
-        }}>
+        <div style={{ position: "absolute", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 6, display: "flex", gap: w < 480 ? 12 : 32, alignItems: "center", opacity: 0, animation: "introDataIn 0.6s 0.8s ease forwards", whiteSpace: "nowrap" }}>
           {["SYS READY", "STREAM INIT", "AUTH OK"].map((label, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{
-                width: 5, height: 5, borderRadius: "50%",
-                background: i === 0 ? "#00e5e5" : i === 1 ? "#a78bfa" : "#3b82f6",
-                boxShadow: `0 0 8px ${i === 0 ? "#00e5e5" : i === 1 ? "#a78bfa" : "#3b82f6"}`,
-                animation: `introSignalPulse ${1.4 + i * 0.3}s ease-in-out ${i * 0.2}s infinite`,
-              }} />
-              <span style={{
-                fontFamily: F_MONO, fontSize: 8.5, fontWeight: 500,
-                color: "#1e2d4a", letterSpacing: 2,
-              }}>{label}</span>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: i === 0 ? "#00e5e5" : i === 1 ? "#a78bfa" : "#3b82f6", boxShadow: `0 0 8px ${i === 0 ? "#00e5e5" : i === 1 ? "#a78bfa" : "#3b82f6"}`, animation: `introSignalPulse ${1.4 + i * 0.3}s ease-in-out ${i * 0.2}s infinite` }} />
+              <span style={{ fontFamily: F_MONO, fontSize: 8.5, fontWeight: 500, color: "#1e2d4a", letterSpacing: 2 }}>{label}</span>
             </div>
           ))}
         </div>
@@ -903,13 +825,7 @@ function IntroAnimation({ onDone }) {
 function GoldText({ children, style = {} }) {
   return (
     <span style={{
-      background: `linear-gradient(95deg,
-        ${C.cyanDeep} 0%,
-        ${C.cyan} 25%,
-        ${C.cyanBright} 50%,
-        ${C.cyanPale} 65%,
-        ${C.violetBright} 85%,
-        ${C.cyan} 100%)`,
+      background: `linear-gradient(95deg, ${C.cyanDeep} 0%, ${C.cyan} 25%, ${C.cyanBright} 50%, ${C.cyanPale} 65%, ${C.violetBright} 85%, ${C.cyan} 100%)`,
       backgroundSize: "300% auto",
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
@@ -950,9 +866,7 @@ function Navbar({ page, setPage, searchQuery, setSearchQuery, watchlist }) {
     <nav style={{
       position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
       height: 68,
-      background: scrolled
-        ? "rgba(0,1,14,0.97)"
-        : "linear-gradient(to bottom, rgba(0,1,14,0.9) 0%, transparent 100%)",
+      background: scrolled ? "rgba(0,1,14,0.97)" : "linear-gradient(to bottom, rgba(0,1,14,0.9) 0%, transparent 100%)",
       backdropFilter: scrolled ? "blur(30px) saturate(200%)" : "none",
       display: "flex", alignItems: "center",
       padding: "0 clamp(16px,4vw,64px)",
@@ -970,44 +884,13 @@ function Navbar({ page, setPage, searchQuery, setSearchQuery, watchlist }) {
         }} />
       )}
 
-      <button onClick={() => setPage("home")} style={{
-        background: "none", border: "none", cursor: "pointer",
-        display: "flex", alignItems: "center", gap: 4,
-        position: "relative", padding: "4px 0",
-      }}>
-        <div style={{
-          position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)",
-          width: 48, height: 48, borderRadius: "50%",
-          background: `radial-gradient(circle, rgba(0,200,200,0.2) 0%, transparent 70%)`,
-          animation: "breathe 3s ease-in-out infinite",
-          pointerEvents: "none",
-        }} />
-        <span style={{
-          fontFamily: F_ACCENT, fontSize: 26, fontWeight: 900,
-          color: C.cyanBright, display: "inline-block",
-          textShadow: `0 0 20px ${C.glowA}, 0 0 60px rgba(0,228,228,0.25)`,
-          animation: "glowFlare 3s ease-in-out infinite",
-          position: "relative", zIndex: 1,
-        }}>S</span>
-        <span style={{
-          fontFamily: F_ACCENT, fontWeight: 700, fontSize: 17,
-          letterSpacing: "0.08em", display: "inline-block",
-          background: `linear-gradient(135deg, ${C.textPrimary} 0%, ${C.textSecond} 70%, ${C.textMuted} 100%)`,
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-          position: "relative", zIndex: 1,
-          animation: navReady ? "logoWordReveal 1s 0.3s cubic-bezier(0.22,1,0.36,1) both" : "none",
-        }}>TREAMIFY</span>
+      <button onClick={() => setPage("home")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, position: "relative", padding: "4px 0" }}>
+        <div style={{ position: "absolute", left: -6, top: "50%", transform: "translateY(-50%)", width: 48, height: 48, borderRadius: "50%", background: `radial-gradient(circle, rgba(0,200,200,0.2) 0%, transparent 70%)`, animation: "breathe 3s ease-in-out infinite", pointerEvents: "none" }} />
+        <span style={{ fontFamily: F_ACCENT, fontSize: 26, fontWeight: 900, color: C.cyanBright, display: "inline-block", textShadow: `0 0 20px ${C.glowA}, 0 0 60px rgba(0,228,228,0.25)`, animation: "glowFlare 3s ease-in-out infinite", position: "relative", zIndex: 1 }}>S</span>
+        <span style={{ fontFamily: F_ACCENT, fontWeight: 700, fontSize: 17, letterSpacing: "0.08em", display: "inline-block", background: `linear-gradient(135deg, ${C.textPrimary} 0%, ${C.textSecond} 70%, ${C.textMuted} 100%)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", position: "relative", zIndex: 1, animation: navReady ? "logoWordReveal 1s 0.3s cubic-bezier(0.22,1,0.36,1) both" : "none" }}>TREAMIFY</span>
         <div style={{ marginLeft: 10, display: "flex", alignItems: "center", gap: 4 }}>
-          <div style={{
-            width: 4, height: 4,
-            background: `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})`,
-            transform: "rotate(45deg)",
-            boxShadow: `0 0 8px ${C.cyan}`,
-          }} />
-          <span style={{
-            fontFamily: F_ACCENT, fontSize: 7, fontWeight: 700,
-            color: C.cyanMid, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9,
-          }}>PRO</span>
+          <div style={{ width: 4, height: 4, background: `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})`, transform: "rotate(45deg)", boxShadow: `0 0 8px ${C.cyan}` }} />
+          <span style={{ fontFamily: F_ACCENT, fontSize: 7, fontWeight: 700, color: C.cyanMid, letterSpacing: 2, textTransform: "uppercase", opacity: 0.9 }}>PRO</span>
         </div>
       </button>
 
@@ -1032,14 +915,7 @@ function Navbar({ page, setPage, searchQuery, setSearchQuery, watchlist }) {
                   animation: navReady ? `navLinkIn 0.5s ${0.1 + i * 0.08}s cubic-bezier(0.22,1,0.36,1) both` : "none",
                   boxShadow: active ? `0 0 20px rgba(0,200,200,0.08), inset 0 1px 0 rgba(0,200,200,0.06)` : "none",
                 }}>
-                {active && (
-                  <span style={{
-                    position: "absolute", bottom: -1, left: "50%", transform: "translateX(-50%)",
-                    width: 20, height: 1.5, borderRadius: 2,
-                    background: `linear-gradient(to right, ${C.cyan}, ${C.cyanBright})`,
-                    boxShadow: `0 0 8px ${C.cyan}`,
-                  }} />
-                )}
+                {active && <span style={{ position: "absolute", bottom: -1, left: "50%", transform: "translateX(-50%)", width: 20, height: 1.5, borderRadius: 2, background: `linear-gradient(to right, ${C.cyan}, ${C.cyanBright})`, boxShadow: `0 0 8px ${C.cyan}` }} />}
                 {l.label}
               </button>
             );
@@ -1049,94 +925,47 @@ function Navbar({ page, setPage, searchQuery, setSearchQuery, watchlist }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         {searchOpen ? (
-          <div style={{
-            display: "flex", alignItems: "center",
-            background: "rgba(0,200,200,0.04)",
-            border: `1px solid ${C.borderGlow}`,
-            borderRadius: 8, overflow: "hidden",
-            boxShadow: `0 0 24px rgba(0,200,200,0.1)`,
-            animation: "scaleIn 0.2s ease",
-          }}>
+          <div style={{ display: "flex", alignItems: "center", background: "rgba(0,200,200,0.04)", border: `1px solid ${C.borderGlow}`, borderRadius: 8, overflow: "hidden", boxShadow: `0 0 24px rgba(0,200,200,0.1)`, animation: "scaleIn 0.2s ease" }}>
             <span style={{ padding: "0 12px", color: C.textMuted, fontSize: 16 }}>⌕</span>
             <input autoFocus value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); setPage("search"); }}
               onBlur={() => !searchQuery && setSearchOpen(false)}
               placeholder="Search titles, genres…"
-              style={{
-                background: "none", border: "none",
-                color: C.textPrimary, fontFamily: F_BODY, fontSize: 13,
-                width: w > 480 ? 220 : 140, outline: "none", padding: "9px 16px 9px 0",
-              }}
+              style={{ background: "none", border: "none", color: C.textPrimary, fontFamily: F_BODY, fontSize: 13, width: w > 480 ? 220 : 140, outline: "none", padding: "9px 16px 9px 0" }}
             />
           </div>
         ) : (
-          <button onClick={() => setSearchOpen(true)} style={{
-            background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`,
-            cursor: "pointer", color: C.textMuted, fontSize: 18,
-            width: 38, height: 38, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
-          }}
+          <button onClick={() => setSearchOpen(true)} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, cursor: "pointer", color: C.textMuted, fontSize: 18, width: 38, height: 38, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}
             onMouseEnter={e => { e.currentTarget.style.color = C.cyanBright; e.currentTarget.style.borderColor = C.borderGlow; e.currentTarget.style.background = "rgba(0,200,200,0.06)"; }}
             onMouseLeave={e => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
           >⌕</button>
         )}
 
-        <button onClick={() => setPage("watchlist")} style={{
-          background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`,
-          cursor: "pointer", color: C.textMuted, width: 38, height: 38, borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          position: "relative", transition: "all 0.2s", fontSize: 18,
-        }}
+        <button onClick={() => setPage("watchlist")} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, cursor: "pointer", color: C.textMuted, width: 38, height: 38, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", transition: "all 0.2s", fontSize: 18 }}
           onMouseEnter={e => { e.currentTarget.style.color = C.cyanBright; e.currentTarget.style.borderColor = C.borderGlow; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.border; }}
         >
           ☆
           {watchlist.length > 0 && (
-            <span style={{
-              position: "absolute", top: -6, right: -6,
-              background: `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})`,
-              borderRadius: "50%", width: 18, height: 18,
-              fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 800, color: C.void, fontFamily: F_BODY,
-              boxShadow: `0 0 12px ${C.glowA}`,
-              border: `1.5px solid ${C.void}`,
-            }}>{watchlist.length}</span>
+            <span style={{ position: "absolute", top: -6, right: -6, background: `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})`, borderRadius: "50%", width: 18, height: 18, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, color: C.void, fontFamily: F_BODY, boxShadow: `0 0 12px ${C.glowA}`, border: `1.5px solid ${C.void}` }}>{watchlist.length}</span>
           )}
         </button>
 
-        <button onClick={() => window.dispatchEvent(new CustomEvent('openAuthModal'))} style={{
-          background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`,
-          cursor: "pointer", color: C.textMuted, width: 38, height: 38, borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-          transition: "all 0.2s",
-        }}
+        <button onClick={() => window.dispatchEvent(new CustomEvent('openAuthModal'))} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, cursor: "pointer", color: C.textMuted, width: 38, height: 38, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, transition: "all 0.2s" }}
           onMouseEnter={e => { e.currentTarget.style.color = C.cyanBright; e.currentTarget.style.borderColor = C.borderGlow; e.currentTarget.style.background = "rgba(0,200,200,0.06)"; }}
           onMouseLeave={e => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.border; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
         >👤</button>
 
         {w <= 768 && (
-          <button onClick={() => setMenuOpen(!menuOpen)} style={{
-            background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`,
-            cursor: "pointer", color: C.textPrimary, width: 38, height: 38, borderRadius: 8,
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
-          }}>☰</button>
+          
+          <button onClick={() => setMenuOpen(!menuOpen)} style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${C.border}`, cursor: "pointer", color: C.textPrimary, width: 38, height: 38, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>☰</button>
         )}
       </div>
 
       {menuOpen && w <= 768 && (
-        <div style={{
-          position: "absolute", top: 68, left: 0, right: 0,
-          background: "rgba(0,1,14,0.99)", backdropFilter: "blur(28px)",
-          borderBottom: `1px solid ${C.border}`, padding: "8px 24px 20px",
-          animation: "fadeSlideDown 0.25s ease",
-        }}>
+        <div style={{ position: "absolute", top: 68, left: 0, right: 0, background: "rgba(0,1,14,0.99)", backdropFilter: "blur(28px)", borderBottom: `1px solid ${C.border}`, padding: "8px 24px 20px", animation: "fadeSlideDown 0.25s ease" }}>
           {navLinks.map((l) => (
-            <button key={l.key} onClick={() => { setPage(l.key); setMenuOpen(false); }} style={{
-              display: "flex", alignItems: "center", gap: 14, background: "none", border: "none",
-              cursor: "pointer", fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: 20,
-              color: page === l.key ? C.cyanBright : C.textMuted,
-              textAlign: "left", padding: "14px 0",
-              borderBottom: `1px solid ${C.border}`, transition: "color 0.2s", width: "100%",
-            }}>{l.label}</button>
+            <button key={l.key} onClick={() => { setPage(l.key); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: 14, background: "none", border: "none", cursor: "pointer", fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: 20, color: page === l.key ? C.cyanBright : C.textMuted, textAlign: "left", padding: "14px 0", borderBottom: `1px solid ${C.border}`, transition: "color 0.2s", width: "100%" }}>{l.label}</button>
           ))}
         </div>
       )}
@@ -1171,66 +1000,21 @@ function VideoCard({ video, onPlay, onDetail, onWatchlist, isInWatchlist, index 
         zIndex: hov ? 10 : 1, willChange: "transform",
       }}
     >
-      <div style={{
-        position: "absolute", inset: 0, borderRadius: 12, zIndex: 6, pointerEvents: "none",
-        border: hov ? `1px solid rgba(0,200,200,0.35)` : `1px solid rgba(255,255,255,0.05)`,
-        transition: "border-color 0.3s",
-      }} />
+      <div style={{ position: "absolute", inset: 0, borderRadius: 12, zIndex: 6, pointerEvents: "none", border: hov ? `1px solid rgba(0,200,200,0.35)` : `1px solid rgba(255,255,255,0.05)`, transition: "border-color 0.3s" }} />
       <img src={video.thumbnail} alt={video.title} loading="lazy"
-        style={{
-          width: "100%", height: cH, objectFit: "cover", display: "block",
-          filter: hov ? "brightness(0.65) saturate(1.2)" : "brightness(0.9)",
-          transition: "filter 0.4s, transform 0.5s",
-          transform: hov ? "scale(1.12)" : "scale(1.02)",
-        }}
+        style={{ width: "100%", height: cH, objectFit: "cover", display: "block", filter: hov ? "brightness(0.65) saturate(1.2)" : "brightness(0.9)", transition: "filter 0.4s, transform 0.5s", transform: hov ? "scale(1.12)" : "scale(1.02)" }}
         onError={e => { e.target.src = `https://picsum.photos/seed/${video.id}x/400/600`; }}
       />
-      <div style={{
-        position: "absolute", top: 10, right: 10, zIndex: 5,
-        background: "rgba(0,1,14,0.85)", backdropFilter: "blur(12px)",
-        borderRadius: 4, padding: "3px 8px",
-        fontFamily: F_ACCENT, fontSize: 8, fontWeight: 700, color: C.textMuted,
-        border: `1px solid ${C.border}`, letterSpacing: 1,
-      }}>{video.rating}</div>
-      <div style={{
-        position: "absolute", top: 10, left: 10, zIndex: 5,
-        background: video.type === "Series" ? "rgba(59,130,246,0.18)" : video.type === "Short" ? "rgba(0,200,200,0.18)" : "rgba(124,58,237,0.18)",
-        backdropFilter: "blur(12px)", borderRadius: 4, padding: "3px 8px",
-        fontFamily: F_ACCENT, fontSize: 8, fontWeight: 700, color: C.textPrimary,
-        border: `1px solid ${video.type === "Series" ? "rgba(59,130,246,0.35)" : video.type === "Short" ? "rgba(0,200,200,0.35)" : "rgba(124,58,237,0.35)"}`,
-        letterSpacing: 1,
-      }}>{video.type.toUpperCase()}</div>
-      <div style={{
-        position: "absolute", inset: 0,
-        background: hov
-          ? `linear-gradient(to top, rgba(0,1,14,1) 0%, rgba(0,1,14,0.75) 50%, rgba(0,1,14,0.05) 100%)`
-          : `linear-gradient(to top, rgba(0,1,14,0.92) 0%, rgba(0,1,14,0.05) 65%)`,
-        transition: "background 0.35s", zIndex: 2,
-      }} />
+      <div style={{ position: "absolute", top: 10, right: 10, zIndex: 5, background: "rgba(0,1,14,0.85)", backdropFilter: "blur(12px)", borderRadius: 4, padding: "3px 8px", fontFamily: F_ACCENT, fontSize: 8, fontWeight: 700, color: C.textMuted, border: `1px solid ${C.border}`, letterSpacing: 1 }}>{video.rating}</div>
+      <div style={{ position: "absolute", top: 10, left: 10, zIndex: 5, background: video.type === "Series" ? "rgba(59,130,246,0.18)" : video.type === "Short" ? "rgba(0,200,200,0.18)" : "rgba(124,58,237,0.18)", backdropFilter: "blur(12px)", borderRadius: 4, padding: "3px 8px", fontFamily: F_ACCENT, fontSize: 8, fontWeight: 700, color: C.textPrimary, border: `1px solid ${video.type === "Series" ? "rgba(59,130,246,0.35)" : video.type === "Short" ? "rgba(0,200,200,0.35)" : "rgba(124,58,237,0.35)"}`, letterSpacing: 1 }}>{video.type.toUpperCase()}</div>
+      <div style={{ position: "absolute", inset: 0, background: hov ? `linear-gradient(to top, rgba(0,1,14,1) 0%, rgba(0,1,14,0.75) 50%, rgba(0,1,14,0.05) 100%)` : `linear-gradient(to top, rgba(0,1,14,0.92) 0%, rgba(0,1,14,0.05) 65%)`, transition: "background 0.35s", zIndex: 2 }} />
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 12px", zIndex: 4 }}>
-        <p style={{
-          fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: w < 480 ? 12.5 : 13.5,
-          fontWeight: 700, color: C.textPrimary, margin: 0, lineHeight: 1.3,
-          transform: hov ? "translateY(-4px)" : "translateY(0)", transition: "transform 0.3s",
-        }}>{video.title}</p>
+        <p style={{ fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: w < 480 ? 12.5 : 13.5, fontWeight: 700, color: C.textPrimary, margin: 0, lineHeight: 1.3, transform: hov ? "translateY(-4px)" : "translateY(0)", transition: "transform 0.3s" }}>{video.title}</p>
         <p style={{ fontFamily: F_BODY, fontSize: 10, color: C.textMuted, margin: "4px 0 0", opacity: hov ? 1 : 0.6, transition: "opacity 0.3s" }}>{video.year} · {video.genre}</p>
         {hov && (
           <div style={{ display: "flex", gap: 6, marginTop: 10, animation: "fadeSlideUp 0.25s ease" }}>
-            <button onClick={e => { e.stopPropagation(); onPlay(video); }} style={{
-              flex: 1,
-              background: `linear-gradient(135deg, ${C.cyanBright} 0%, ${C.cyan} 100%)`,
-              color: C.void, border: "none", borderRadius: 6, padding: "7px 0",
-              fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F_BODY,
-              boxShadow: `0 4px 18px ${C.glowA}`, letterSpacing: 0.5,
-            }}>▶ Play</button>
-            <button onClick={e => { e.stopPropagation(); onWatchlist(video); }} style={{
-              width: 34,
-              background: isInWatchlist ? `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})` : "rgba(255,255,255,0.07)",
-              color: isInWatchlist ? C.void : "#fff",
-              border: `1px solid ${isInWatchlist ? C.cyan : C.border}`,
-              borderRadius: 6, fontSize: 14, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s",
-            }}>{isInWatchlist ? "✓" : "+"}</button>
+            <button onClick={e => { e.stopPropagation(); onPlay(video); }} style={{ flex: 1, background: `linear-gradient(135deg, ${C.cyanBright} 0%, ${C.cyan} 100%)`, color: C.void, border: "none", borderRadius: 6, padding: "7px 0", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: F_BODY, boxShadow: `0 4px 18px ${C.glowA}`, letterSpacing: 0.5 }}>▶ Play</button>
+            <button onClick={e => { e.stopPropagation(); onWatchlist(video); }} style={{ width: 34, background: isInWatchlist ? `linear-gradient(135deg, ${C.cyan}, ${C.violetBright})` : "rgba(255,255,255,0.07)", color: isInWatchlist ? C.void : "#fff", border: `1px solid ${isInWatchlist ? C.cyan : C.border}`, borderRadius: 6, fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }}>{isInWatchlist ? "✓" : "+"}</button>
           </div>
         )}
       </div>
@@ -1255,18 +1039,7 @@ function CategoryRow({ label, videos, onPlay, onDetail, onWatchlist, watchlist }
   if (!videos.length) return null;
 
   const ArrowBtn = ({ dir, show, onClick }) => show ? (
-    <button onClick={onClick} style={{
-      position: "absolute", [dir < 0 ? "left" : "right"]: 0, top: "50%",
-      transform: "translateY(-50%)", zIndex: 5,
-      background: dir < 0
-        ? `linear-gradient(to right, rgba(0,1,14,0.99) 55%, transparent)`
-        : `linear-gradient(to left, rgba(0,1,14,0.99) 55%, transparent)`,
-      border: "none", color: C.textMuted, width: 60, height: 90,
-      cursor: "pointer", fontSize: 30, display: "flex", alignItems: "center",
-      justifyContent: dir < 0 ? "flex-start" : "flex-end",
-      paddingLeft: dir < 0 ? 14 : 0, paddingRight: dir < 0 ? 0 : 14,
-      transition: "color 0.2s",
-    }}
+    <button onClick={onClick} style={{ position: "absolute", [dir < 0 ? "left" : "right"]: 0, top: "50%", transform: "translateY(-50%)", zIndex: 5, background: dir < 0 ? `linear-gradient(to right, rgba(0,1,14,0.99) 55%, transparent)` : `linear-gradient(to left, rgba(0,1,14,0.99) 55%, transparent)`, border: "none", color: C.textMuted, width: 60, height: 90, cursor: "pointer", fontSize: 30, display: "flex", alignItems: "center", justifyContent: dir < 0 ? "flex-start" : "flex-end", paddingLeft: dir < 0 ? 14 : 0, paddingRight: dir < 0 ? 0 : 14, transition: "color 0.2s" }}
       onMouseEnter={e => e.currentTarget.style.color = C.cyanBright}
       onMouseLeave={e => e.currentTarget.style.color = C.textMuted}
     >{dir < 0 ? "‹" : "›"}</button>
@@ -1285,13 +1058,9 @@ function CategoryRow({ label, videos, onPlay, onDetail, onWatchlist, watchlist }
       </div>
       <div style={{ position: "relative" }}>
         <ArrowBtn dir={-1} show={canLeft} onClick={() => scroll(-1)} />
-        <div ref={ref} onScroll={upd} className="scrollbar-hide" style={{
-          display: "flex", gap: w < 480 ? 10 : 14, overflowX: "auto",
-          padding: `18px clamp(16px,4vw,64px)`, WebkitOverflowScrolling: "touch",
-        }}>
+        <div ref={ref} onScroll={upd} className="scrollbar-hide" style={{ display: "flex", gap: w < 480 ? 10 : 14, overflowX: "auto", padding: `18px clamp(16px,4vw,64px)`, WebkitOverflowScrolling: "touch" }}>
           {videos.map((v, i) => (
-            <VideoCard key={v.id} video={v} index={i} onPlay={onPlay} onDetail={onDetail}
-              onWatchlist={onWatchlist} isInWatchlist={watchlist.some(wl => wl.id === v.id)} />
+            <VideoCard key={v.id} video={v} index={i} onPlay={onPlay} onDetail={onDetail} onWatchlist={onWatchlist} isInWatchlist={watchlist.some(wl => wl.id === v.id)} />
           ))}
         </div>
         <ArrowBtn dir={1} show={canRight} onClick={() => scroll(1)} />
@@ -1314,49 +1083,21 @@ function HeroBanner({ video, onPlay, onWatchlist, isInWatchlist }) {
       <img src={video.banner} alt={video.title}
         onLoad={() => setBgLoaded(true)}
         onError={e => { e.target.src = `https://picsum.photos/seed/${video.id}hero/1600/900`; setBgLoaded(true); }}
-        style={{
-          width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top",
-          opacity: bgLoaded ? 1 : 0, transition: "opacity 1.4s",
-          filter: "saturate(1.1) contrast(1.08)",
-        }}
+        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", opacity: bgLoaded ? 1 : 0, transition: "opacity 1.4s", filter: "saturate(1.1) contrast(1.08)" }}
       />
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,1,14,0.97) 0%, rgba(0,1,14,0.55) 50%, rgba(0,1,14,0.1) 100%)" }} />
       <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,1,14,1) 0%, rgba(0,1,14,0.3) 55%, transparent 85%)" }} />
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 25% 65%, rgba(0,200,200,0.06) 0%, transparent 55%)" }} />
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 75% 30%, rgba(124,58,237,0.05) 0%, transparent 50%)" }} />
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none",
-        background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 3px)",
-      }} />
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 3px)" }} />
 
-      <div style={{
-        position: "absolute", bottom: w > 768 ? "13%" : "8%",
-        left: "clamp(20px,4vw,76px)", maxWidth: w < 480 ? "94%" : 600,
-        opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(60px)",
-        transition: "all 1.1s cubic-bezier(0.22,1,0.36,1)",
-      }}>
+      <div style={{ position: "absolute", bottom: w > 768 ? "13%" : "8%", left: "clamp(20px,4vw,76px)", maxWidth: w < 480 ? "94%" : 600, opacity: vis ? 1 : 0, transform: vis ? "translateY(0)" : "translateY(60px)", transition: "all 1.1s cubic-bezier(0.22,1,0.36,1)" }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-          <span style={{
-            background: `linear-gradient(135deg, ${C.cyanDeep}, ${C.cyan})`,
-            color: C.void, padding: "5px 16px", borderRadius: 4,
-            fontSize: 8, fontWeight: 800, fontFamily: F_ACCENT,
-            letterSpacing: 4, textTransform: "uppercase",
-            boxShadow: `0 0 28px ${C.glowA}`,
-          }}>✦ FEATURED</span>
-          <span style={{
-            background: "rgba(255,255,255,0.05)", color: C.textMuted,
-            padding: "5px 14px", borderRadius: 4, fontSize: 8,
-            fontFamily: F_ACCENT, letterSpacing: 2, backdropFilter: "blur(14px)",
-            border: `1px solid ${C.border}`,
-          }}>{video.rating}</span>
+          <span style={{ background: `linear-gradient(135deg, ${C.cyanDeep}, ${C.cyan})`, color: C.void, padding: "5px 16px", borderRadius: 4, fontSize: 8, fontWeight: 800, fontFamily: F_ACCENT, letterSpacing: 4, textTransform: "uppercase", boxShadow: `0 0 28px ${C.glowA}` }}>✦ FEATURED</span>
+          <span style={{ background: "rgba(255,255,255,0.05)", color: C.textMuted, padding: "5px 14px", borderRadius: 4, fontSize: 8, fontFamily: F_ACCENT, letterSpacing: 2, backdropFilter: "blur(14px)", border: `1px solid ${C.border}` }}>{video.rating}</span>
         </div>
 
-        <h1 style={{
-          fontFamily: F_DISPLAY, fontStyle: "italic",
-          fontSize: "clamp(28px,5.5vw,72px)", fontWeight: 900,
-          margin: "0 0 18px", lineHeight: 1.0, color: C.textPrimary,
-          filter: "drop-shadow(0 4px 28px rgba(0,0,0,0.6))",
-        }}>{video.title}</h1>
+        <h1 style={{ fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: "clamp(28px,5.5vw,72px)", fontWeight: 900, margin: "0 0 18px", lineHeight: 1.0, color: C.textPrimary, filter: "drop-shadow(0 4px 28px rgba(0,0,0,0.6))" }}>{video.title}</h1>
 
         <div style={{ display: "flex", gap: 0, marginBottom: 22, alignItems: "center", flexWrap: "wrap" }}>
           {[video.year, video.duration, video.genre].map((t, i) => (
@@ -1367,49 +1108,22 @@ function HeroBanner({ video, onPlay, onWatchlist, isInWatchlist }) {
           ))}
         </div>
 
-        <p style={{
-          fontFamily: F_BODY, fontSize: "clamp(13px,1.2vw,15px)", color: C.textMuted,
-          lineHeight: 1.82, marginBottom: 36, maxWidth: 520,
-          display: w < 480 ? "-webkit-box" : "block",
-          WebkitLineClamp: w < 480 ? 2 : "unset",
-          WebkitBoxOrient: "vertical", overflow: w < 480 ? "hidden" : "visible",
-        }}>{video.description}</p>
+        <p style={{ fontFamily: F_BODY, fontSize: "clamp(13px,1.2vw,15px)", color: C.textMuted, lineHeight: 1.82, marginBottom: 36, maxWidth: 520, display: w < 480 ? "-webkit-box" : "block", WebkitLineClamp: w < 480 ? 2 : "unset", WebkitBoxOrient: "vertical", overflow: w < 480 ? "hidden" : "visible" }}>{video.description}</p>
 
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-          <button onClick={() => onPlay(video)} style={{
-            background: `linear-gradient(135deg, ${C.cyanBright} 0%, ${C.cyan} 55%, ${C.cyanDeep} 100%)`,
-            color: C.void, border: "none",
-            padding: w < 480 ? "12px 28px" : "15px 44px",
-            borderRadius: 8, fontSize: w < 480 ? 13 : 15, fontWeight: 700,
-            cursor: "pointer", fontFamily: F_BODY,
-            display: "flex", alignItems: "center", gap: 10,
-            boxShadow: `0 6px 32px ${C.glowA}, 0 2px 0 rgba(255,255,255,0.06) inset`,
-            letterSpacing: 0.5, transition: "all 0.25s",
-          }}
+          <button onClick={() => onPlay(video)} style={{ background: `linear-gradient(135deg, ${C.cyanBright} 0%, ${C.cyan} 55%, ${C.cyanDeep} 100%)`, color: C.void, border: "none", padding: w < 480 ? "12px 28px" : "15px 44px", borderRadius: 8, fontSize: w < 480 ? 13 : 15, fontWeight: 700, cursor: "pointer", fontFamily: F_BODY, display: "flex", alignItems: "center", gap: 10, boxShadow: `0 6px 32px ${C.glowA}, 0 2px 0 rgba(255,255,255,0.06) inset`, letterSpacing: 0.5, transition: "all 0.25s" }}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 14px 50px ${C.glowA}`; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 6px 32px ${C.glowA}`; }}
           >▶&ensp;Play Now</button>
 
-          <button onClick={() => onWatchlist(video)} style={{
-            background: "rgba(255,255,255,0.04)", color: C.textPrimary,
-            border: `1px solid ${isInWatchlist ? C.cyan : "rgba(255,255,255,0.14)"}`,
-            padding: w < 480 ? "12px 22px" : "15px 32px",
-            borderRadius: 8, fontSize: w < 480 ? 13 : 15, fontWeight: 500,
-            cursor: "pointer", fontFamily: F_DISPLAY, fontStyle: "italic",
-            backdropFilter: "blur(20px)", transition: "all 0.25s",
-            boxShadow: isInWatchlist ? `0 0 24px rgba(0,200,200,0.15)` : "none",
-          }}
+          <button onClick={() => onWatchlist(video)} style={{ background: "rgba(255,255,255,0.04)", color: C.textPrimary, border: `1px solid ${isInWatchlist ? C.cyan : "rgba(255,255,255,0.14)"}`, padding: w < 480 ? "12px 22px" : "15px 32px", borderRadius: 8, fontSize: w < 480 ? 13 : 15, fontWeight: 500, cursor: "pointer", fontFamily: F_DISPLAY, fontStyle: "italic", backdropFilter: "blur(20px)", transition: "all 0.25s", boxShadow: isInWatchlist ? `0 0 24px rgba(0,200,200,0.15)` : "none" }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(0,200,200,0.07)"; e.currentTarget.style.borderColor = C.cyan; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = isInWatchlist ? C.cyan : "rgba(255,255,255,0.14)"; }}
           >{isInWatchlist ? "✓ In Watchlist" : "＋ Watchlist"}</button>
         </div>
       </div>
 
-      <div style={{
-        position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)",
-        display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
-        opacity: vis ? 0.3 : 0, transition: "opacity 1s 2s", pointerEvents: "none",
-      }}>
+      <div style={{ position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, opacity: vis ? 0.3 : 0, transition: "opacity 1s 2s", pointerEvents: "none" }}>
         <span style={{ fontFamily: F_ACCENT, fontSize: 7, letterSpacing: 4, color: C.textMuted, textTransform: "uppercase" }}>Scroll</span>
         <div style={{ width: 1, height: 36, background: `linear-gradient(to bottom, ${C.cyan}, transparent)`, animation: "float2 2.2s ease-in-out infinite" }} />
       </div>
@@ -1419,8 +1133,10 @@ function HeroBanner({ video, onPlay, onWatchlist, isInWatchlist }) {
 
 /* ══════════════════════════════════════════════
    VIDEO PLAYER
+   - Desktop: side panel with VISIBLE scrollbar
+   - Mobile (≤768): matches screenshot layout
 ══════════════════════════════════════════════ */
-function VideoPlayer({ video, allVideos, onClose }) {
+function VideoPlayer({ video, allVideos, onClose, onDetail }) {
   const videoRef = useRef();
   const containerRef = useRef();
   const progressRef = useRef();
@@ -1449,12 +1165,13 @@ function VideoPlayer({ video, allVideos, onClose }) {
   const [currentVideoIndex, setCurrentVideoIndex] = useState(() => allVideos.findIndex(v => v.id === video.id));
   const [currentVideo, setCurrentVideo] = useState(video);
   const [volumeHovered, setVolumeHovered] = useState(false);
+  const [zoomMode, setZoomMode] = useState("contain");
   const { w } = useWindowSize();
 
   const relatedVideos = allVideos.filter(v =>
     v.id !== currentVideo.id &&
     (v.genre === currentVideo.genre || v.categories?.some(c => currentVideo.categories?.includes(c)))
-  ).slice(0, 6);
+  ).slice(0, 8);
 
   const seekToPosition = useCallback((clientX) => {
     if (!progressRef.current || !videoRef.current) return;
@@ -1607,13 +1324,473 @@ function VideoPlayer({ video, allVideos, onClose }) {
   );
 
   const nextVideo = allVideos[(currentVideoIndex + 1) % allVideos.length];
-  
-  // Apply video page scrollbar fixes
+
   useEffect(() => {
     document.body.classList.add('video-page-active');
     return () => document.body.classList.remove('video-page-active');
   }, []);
 
+  /* ══════════════════════════════
+     MOBILE PLAYER UI (≤ 768px)
+     Matches screenshot layout:
+     - "← Back" button top-left
+     - Video player area (16:9)
+     - Progress bar with timestamps
+     - Controls: [-10] [▶] [+10] ... [⚙] [⛶] [✕]
+     - Video metadata tags + description
+     - "UP NEXT" section with thumbnail list
+  ══════════════════════════════ */
+  if (w <= 768) {
+    const upNextList = allVideos.filter(v => v.id !== currentVideo.id);
+
+    // Shared icon button style for mobile controls
+    const mobileCtrlBtn = (onClick, children, accent = false) => (
+      <button
+        onClick={e => { e.stopPropagation(); onClick(); }}
+        style={{
+          background: accent
+            ? `linear-gradient(135deg, ${C.cyanMid}, ${C.cyanDeep})`
+            : "rgba(255,255,255,0.06)",
+          border: accent ? "none" : "1px solid rgba(255,255,255,0.1)",
+          color: accent ? C.void : C.textPrimary,
+          cursor: "pointer",
+          width: accent ? 52 : 44,
+          height: accent ? 52 : 44,
+          borderRadius: accent ? 12 : 10,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+          fontSize: accent ? 18 : 15,
+          boxShadow: accent ? `0 4px 20px rgba(0,200,200,0.35)` : "none",
+          transition: "all 0.15s",
+        }}
+      >
+        <span style={{ pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</span>
+      </button>
+    );
+
+    // Small icon button (⚙ ⛶ ✕)
+    const mobileSmallBtn = (onClick, children, tint = false) => (
+      <button
+        onClick={e => { e.stopPropagation(); onClick(); }}
+        style={{
+          background: tint ? "rgba(0,200,200,0.06)" : "rgba(255,255,255,0.05)",
+          border: `1px solid ${tint ? "rgba(0,200,200,0.22)" : "rgba(255,255,255,0.09)"}`,
+          color: tint ? C.cyanBright : C.textMuted,
+          cursor: "pointer",
+          width: 38, height: 38,
+          borderRadius: 9,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, fontSize: 15,
+          transition: "all 0.15s",
+        }}
+      >
+        <span style={{ pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" }}>{children}</span>
+      </button>
+    );
+
+    return (
+      <div ref={containerRef} style={{
+        position: "fixed", inset: 0,
+        background: "#06070f",
+        zIndex: 2000,
+        display: "flex", flexDirection: "column",
+        overflow: "hidden",
+      }}>
+
+        {/* ── BACK BUTTON ROW ── */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          padding: "10px 14px 8px",
+          background: "rgba(0,0,0,0.5)",
+          flexShrink: 0,
+          borderBottom: "1px solid rgba(255,255,255,0.05)",
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: C.textPrimary,
+              padding: "8px 16px 8px 12px",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontFamily: F_BODY, fontSize: 13, fontWeight: 600,
+              letterSpacing: 0.3,
+            }}
+          >
+            <span style={{ fontSize: 16, lineHeight: 1 }}>←</span>
+            <span>Back</span>
+          </button>
+        </div>
+
+        {/* ── VIDEO AREA ── */}
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            aspectRatio: "16/9",
+            background: "#000",
+            flexShrink: 0,
+          }}
+          onClick={togglePlay}
+        >
+          <video
+            key={currentVideo.id}
+            ref={videoRef}
+            src={currentVideo.videoUrl}
+            style={{ width: "100%", height: "100%", objectFit: zoomMode, display: "block" }}
+            preload="auto"
+            playsInline
+          />
+
+          {/* Loading spinner */}
+          {loading && (
+            <div style={{
+              position: "absolute", inset: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(0,0,0,0.35)",
+              pointerEvents: "none",
+            }}>
+              <div style={{ position: "relative", width: 52, height: 52 }}>
+                <div style={{
+                  position: "absolute", inset: 0, borderRadius: "50%",
+                  border: "2px solid rgba(0,200,200,0.15)",
+                  borderTop: `2px solid ${C.cyanBright}`,
+                  animation: "spin 0.75s linear infinite",
+                }} />
+                <div style={{
+                  position: "absolute", inset: 7, borderRadius: "50%",
+                  border: "2px solid rgba(124,58,237,0.15)",
+                  borderBottom: `2px solid ${C.violetBright}`,
+                  animation: "spinR 1.1s linear infinite",
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Paused overlay play icon */}
+          {!playing && !loading && (
+            <div style={{
+              position: "absolute", inset: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "none",
+            }}>
+              <div style={{
+                width: 62, height: 62, borderRadius: "50%",
+                background: "rgba(0,200,200,0.18)",
+                backdropFilter: "blur(12px)",
+                border: `2px solid rgba(0,200,200,0.4)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 22, color: C.cyanBright,
+                boxShadow: `0 0 40px rgba(0,200,200,0.2)`,
+              }}>▶</div>
+            </div>
+          )}
+
+          {/* Right-edge scroll indicator bars */}
+          <div style={{
+            position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
+            display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3,
+            paddingRight: 3, pointerEvents: "none",
+          }}>
+            {[C.cyanBright, C.violetBright, C.electricPale, C.cyanMid, C.violetMid].map((col, i) => (
+              <div key={i} style={{
+                width: 3, height: 16 + i * 4,
+                background: col, borderRadius: "2px 0 0 2px",
+                opacity: 0.5,
+                boxShadow: `0 0 6px ${col}`,
+              }} />
+            ))}
+          </div>
+        </div>
+
+        {/* ── PROGRESS BAR WITH TIMESTAMPS ── */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "8px 14px 4px",
+          background: "rgba(0,0,0,0.6)",
+          flexShrink: 0,
+        }}>
+          <span style={{ fontFamily: F_MONO, fontSize: 11, color: C.textMuted, minWidth: 36, textAlign: "right" }}>
+            {fmt(currentTime)}
+          </span>
+          <div
+            ref={progressRef}
+            style={{
+              flex: 1, height: 4, borderRadius: 4,
+              background: "rgba(255,255,255,0.08)",
+              position: "relative", cursor: "pointer",
+            }}
+            onMouseDown={e => { scrubbingRef.current = true; seekToPosition(e.clientX); }}
+            onTouchStart={e => { scrubbingRef.current = true; seekToPosition(e.touches[0].clientX); }}
+            onClick={e => seekToPosition(e.clientX)}
+          >
+            {/* Buffered */}
+            <div style={{
+              position: "absolute", left: 0, top: 0,
+              height: "100%", width: `${buffered}%`,
+              background: "rgba(255,255,255,0.12)", borderRadius: 4,
+              pointerEvents: "none",
+            }} />
+            {/* Progress fill */}
+            <div style={{
+              position: "absolute", left: 0, top: 0,
+              height: "100%", width: `${Math.min(100, progress)}%`,
+              background: `linear-gradient(to right, ${C.cyanDeep}, ${C.cyanBright})`,
+              borderRadius: 4, pointerEvents: "none",
+              boxShadow: `0 0 8px ${C.cyan}`,
+            }} />
+            {/* Thumb dot */}
+            <div style={{
+              position: "absolute", top: "50%",
+              left: `${Math.min(100, progress)}%`,
+              transform: "translate(-50%, -50%)",
+              width: 13, height: 13, borderRadius: "50%",
+              background: C.cyanBright,
+              boxShadow: `0 0 10px ${C.cyan}`,
+              pointerEvents: "none",
+            }} />
+          </div>
+          <span style={{ fontFamily: F_MONO, fontSize: 11, color: C.textMuted, minWidth: 36 }}>
+            {fmt(duration)}
+          </span>
+        </div>
+
+        {/* ── CONTROLS ROW ── */}
+        <div style={{
+          display: "flex", alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 14px 10px",
+          background: "rgba(0,0,0,0.5)",
+          flexShrink: 0,
+          gap: 6,
+        }}>
+          {/* Left group: -10, play/pause, +10 */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {mobileCtrlBtn(() => seek(-10),
+              <span style={{ fontFamily: F_MONO, fontSize: 12, fontWeight: 700 }}>-10</span>
+            )}
+            {mobileCtrlBtn(togglePlay,
+              playing
+                ? <SVGIcon path={ICONS.pause} size={22} />
+                : <SVGIcon path={ICONS.play} size={22} />,
+              true
+            )}
+            {mobileCtrlBtn(() => seek(10),
+              <span style={{ fontFamily: F_MONO, fontSize: 12, fontWeight: 700 }}>+10</span>
+            )}
+          </div>
+
+          {/* Right group: ⚙ ⛶ ✕ */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {mobileSmallBtn(
+              () => setSettingsOpen(o => !o),
+              <SVGIcon path={ICONS.settings} size={17} />,
+              settingsOpen
+            )}
+            {mobileSmallBtn(toggleFS,
+              fullscreen
+                ? <SVGIcon path={ICONS.exitFS} size={17} />
+                : <SVGIcon path={ICONS.fullscreen} size={17} />
+            )}
+            <button
+              onClick={e => { e.stopPropagation(); onClose(); }}
+              style={{
+                background: "rgba(124,58,237,0.1)",
+                border: "1px solid rgba(124,58,237,0.28)",
+                color: C.violetBright,
+                cursor: "pointer",
+                width: 38, height: 38,
+                borderRadius: 9,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, flexShrink: 0,
+              }}
+            >✕</button>
+          </div>
+        </div>
+
+        {/* Settings Panel (mobile) */}
+        {settingsOpen && (
+          <div style={{
+            position: "absolute", bottom: 0, left: 0, right: 0,
+            background: "rgba(2,3,20,0.99)", backdropFilter: "blur(32px)",
+            border: `1px solid ${C.borderGlow}`,
+            borderRadius: "20px 20px 0 0",
+            padding: "22px 20px 32px",
+            zIndex: 30,
+            animation: "fadeSlideUp 0.22s ease",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <p style={{ fontFamily: F_ACCENT, fontSize: 10, fontWeight: 700, color: C.cyan, letterSpacing: 3, textTransform: "uppercase", margin: 0 }}>Settings</p>
+              <button onClick={() => setSettingsOpen(false)} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
+            </div>
+            {[
+              { title: "Quality", opts: ["Auto","1080p","720p","480p","360p"], val: quality, set: setQuality },
+              { title: "Speed", opts: [0.5,0.75,1,1.25,1.5,2].map(s => ({ label: `${s}×`, val: s })), val: speed, set: v => { setSpeed(v); if (videoRef.current) videoRef.current.playbackRate = v; } },
+            ].map(grp => (
+              <div key={grp.title} style={{ marginBottom: 18 }}>
+                <p style={{ fontSize: 9, color: C.textMuted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 2, fontFamily: F_BODY }}>{grp.title}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {grp.opts.map(o => {
+                    const isObj = typeof o === "object";
+                    const label = isObj ? o.label : o;
+                    const val = isObj ? o.val : o;
+                    const active = grp.val === val;
+                    return (
+                      <button key={label} onClick={() => { grp.set(val); }}
+                        style={{ background: active ? `linear-gradient(135deg, ${C.cyan}, ${C.cyanDeep})` : "rgba(255,255,255,0.05)", color: active ? C.void : C.textPrimary, border: "none", borderRadius: 6, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: F_BODY, fontWeight: active ? 700 : 400 }}>{label}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── SCROLLABLE CONTENT: metadata + up next ── */}
+        <div
+          className="mobile-upnext-scroll"
+          style={{ flex: 1, overflowY: "auto", background: "#06070f" }}
+        >
+          {/* Video metadata */}
+          <div style={{ padding: "14px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            {/* Tag pills: year, genre, rating, duration */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {[currentVideo.year, currentVideo.genre, currentVideo.rating, currentVideo.duration].map((t, i) => (
+                <span key={i} style={{
+                  fontFamily: F_BODY, fontSize: 11, fontWeight: 600,
+                  color: i === 0 ? C.textSecond : C.textMuted,
+                  padding: "4px 11px",
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 6,
+                }}>{t}</span>
+              ))}
+            </div>
+            {/* Description */}
+            <p style={{
+              fontFamily: F_BODY, fontSize: 13,
+              color: C.textMuted, lineHeight: 1.75,
+              margin: 0,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}>
+              {currentVideo.description}
+            </p>
+          </div>
+
+          {/* UP NEXT header */}
+          <div style={{ padding: "14px 14px 8px", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 3, height: 14, background: C.cyanBright, borderRadius: 2, boxShadow: `0 0 8px ${C.cyanBright}` }} />
+            <span style={{
+              fontFamily: F_ACCENT, fontSize: 9, fontWeight: 700,
+              color: C.cyanBright, letterSpacing: 4,
+              textTransform: "uppercase",
+            }}>UP NEXT</span>
+          </div>
+
+          {/* Up next list */}
+          <div style={{ paddingBottom: 40 }}>
+            {upNextList.map(v => (
+              <button
+                key={v.id}
+                onClick={() => {
+                  const idx = allVideos.findIndex(a => a.id === v.id);
+                  if (idx !== -1) switchVideo(idx);
+                }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "10px 14px",
+                  background: "transparent", border: "none",
+                  cursor: "pointer", width: "100%", textAlign: "left",
+                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(0,200,200,0.04)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                {/* Thumbnail */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <img
+                    src={v.thumbnail} alt={v.title}
+                    style={{
+                      width: 130, height: 72, objectFit: "cover",
+                      borderRadius: 8, display: "block",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                    }}
+                    onError={e => { e.target.src = `https://picsum.photos/seed/${v.id}mn/400/300`; }}
+                  />
+                  {/* Play overlay on thumbnail */}
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    borderRadius: 8,
+                    background: "rgba(0,0,0,0.18)",
+                  }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: "50%",
+                      background: "rgba(0,0,0,0.55)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 10, color: "#fff",
+                    }}>▶</div>
+                  </div>
+                  {/* Duration badge */}
+                  <div style={{
+                    position: "absolute", bottom: 4, right: 4,
+                    background: "rgba(0,0,0,0.82)",
+                    borderRadius: 3, padding: "2px 5px",
+                  }}>
+                    <span style={{ fontFamily: F_MONO, fontSize: 9, color: "#ddd" }}>{v.duration}</span>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Title */}
+                  <p style={{
+                    fontFamily: F_DISPLAY, fontStyle: "italic",
+                    fontSize: 14, fontWeight: 700,
+                    color: C.textPrimary, margin: "0 0 4px",
+                    overflow: "hidden", textOverflow: "ellipsis",
+                    display: "-webkit-box", WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical", lineHeight: 1.25,
+                  }}>{v.title}</p>
+                  {/* Genre · Year */}
+                  <p style={{
+                    fontFamily: F_BODY, fontSize: 11,
+                    color: C.textMuted, margin: "0 0 6px",
+                  }}>{v.genre} · {v.year}</p>
+                  {/* Type badge */}
+                  {v.type && (
+                    <span style={{
+                      fontFamily: F_ACCENT, fontSize: 8, fontWeight: 700,
+                      letterSpacing: 2,
+                      color: v.type === "Short" ? C.cyanBright : v.type === "Series" ? C.electricPale : C.violetBright,
+                      background: v.type === "Short"
+                        ? "rgba(0,200,200,0.1)"
+                        : v.type === "Series"
+                        ? "rgba(59,130,246,0.1)"
+                        : "rgba(124,58,237,0.1)",
+                      border: `1px solid ${v.type === "Short" ? "rgba(0,200,200,0.25)" : v.type === "Series" ? "rgba(59,130,246,0.25)" : "rgba(124,58,237,0.25)"}`,
+                      borderRadius: 4, padding: "3px 8px",
+                      textTransform: "uppercase",
+                    }}>{v.type}</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ══════════════════════════════
+     DESKTOP PLAYER UI (> 768px)
+  ══════════════════════════════ */
   return (
     <div className="video-player-container" style={{ position: "fixed", inset: 0, background: "#000", zIndex: 2000, display: "flex" }}>
       <div ref={containerRef} onMouseMove={showControlsTemp}
@@ -1621,7 +1798,7 @@ function VideoPlayer({ video, allVideos, onClose }) {
         style={{ position: "relative", flex: 1, background: "#000", cursor: controlsVisible ? "default" : "none", overflow: "hidden" }}
       >
         <video key={currentVideo.id} ref={videoRef} src={currentVideo.videoUrl}
-          style={{ width: "100%", height: "100%", objectFit: "contain", pointerEvents: "none" }}
+          style={{ width: "100%", height: "100%", objectFit: zoomMode, pointerEvents: "none" }}
           preload="auto" playsInline />
 
         {loading && (
@@ -1677,7 +1854,7 @@ function VideoPlayer({ video, allVideos, onClose }) {
           >← Back</button>
         </div>
 
-        <div style={{ position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)", zIndex: 20, opacity: controlsVisible && w > 600 ? 1 : 0, transition: "opacity 0.3s", pointerEvents: "none", textAlign: "center" }}>
+        <div style={{ position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)", zIndex: 20, opacity: controlsVisible ? 1 : 0, transition: "opacity 0.3s", pointerEvents: "none", textAlign: "center" }}>
           <p style={{ fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: 17, color: C.textPrimary, margin: 0, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", maxWidth: "50vw", textOverflow: "ellipsis" }}>{currentVideo.title}</p>
           <p style={{ fontFamily: F_BODY, fontSize: 11, color: C.textMuted, margin: "3px 0 0" }}>{currentVideoIndex + 1} / {allVideos.length}</p>
         </div>
@@ -1713,7 +1890,7 @@ function VideoPlayer({ video, allVideos, onClose }) {
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              {w > 600 && cBtn(handlePrev, <SVGIcon path={ICONS.prev} />)}
+              {cBtn(handlePrev, <SVGIcon path={ICONS.prev} />)}
               {cBtn(() => seek(-10), <span style={{ fontSize: 11, fontWeight: 700, fontFamily: F_BODY }}>−10</span>)}
               <button onClick={e => { e.stopPropagation(); togglePlay(); }}
                 style={{ background: `linear-gradient(135deg, ${C.cyan} 0%, ${C.cyanDeep} 100%)`, border: "none", color: C.void, cursor: "pointer", width: 50, height: 50, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 24px ${C.glowA}`, flexShrink: 0, transition: "all 0.15s" }}
@@ -1726,30 +1903,26 @@ function VideoPlayer({ video, allVideos, onClose }) {
                 </span>
               </button>
               {cBtn(() => seek(10), <span style={{ fontSize: 11, fontWeight: 700, fontFamily: F_BODY }}>+10</span>)}
-              {w > 600 && cBtn(handleNext, <SVGIcon path={ICONS.next} />)}
-              {w > 768 && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}
-                  onMouseEnter={() => setVolumeHovered(true)}
-                  onMouseLeave={() => setVolumeHovered(false)}
-                >
-                  {cBtn(toggleMute, muted || volume === 0 ? <SVGIcon path={ICONS.volMute} /> : <SVGIcon path={ICONS.volHigh} />)}
-                  <div style={{ overflow: "hidden", width: volumeHovered ? 90 : 0, transition: "width 0.2s", display: "flex", alignItems: "center" }}>
-                    <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : volume}
-                      onChange={e => { const v = parseFloat(e.target.value); setVolume(v); if (videoRef.current) videoRef.current.volume = v; setMuted(v === 0); }}
-                      onClick={e => e.stopPropagation()}
-                      style={{ width: 80, accentColor: C.cyan, cursor: "pointer" }}
-                    />
-                  </div>
-                  {volumeHovered && <span style={{ fontFamily: F_MONO, fontSize: 10, color: C.textMuted, minWidth: 32 }}>{Math.round((muted ? 0 : volume) * 100)}%</span>}
+              {cBtn(handleNext, <SVGIcon path={ICONS.next} />)}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}
+                onMouseEnter={() => setVolumeHovered(true)}
+                onMouseLeave={() => setVolumeHovered(false)}
+              >
+                {cBtn(toggleMute, muted || volume === 0 ? <SVGIcon path={ICONS.volMute} /> : <SVGIcon path={ICONS.volHigh} />)}
+                <div style={{ overflow: "hidden", width: volumeHovered ? 90 : 0, transition: "width 0.2s", display: "flex", alignItems: "center" }}>
+                  <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : volume}
+                    onChange={e => { const v = parseFloat(e.target.value); setVolume(v); if (videoRef.current) videoRef.current.volume = v; setMuted(v === 0); }}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: 80, accentColor: C.cyan, cursor: "pointer" }}
+                  />
                 </div>
-              )}
+                {volumeHovered && <span style={{ fontFamily: F_MONO, fontSize: 10, color: C.textMuted, minWidth: 32 }}>{Math.round((muted ? 0 : volume) * 100)}%</span>}
+              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
-              {w > 600 && (
-                <button onClick={e => { e.stopPropagation(); setSubtitles(s => !s); }}
-                  style={{ background: subtitles ? "rgba(0,200,200,0.1)" : "rgba(255,255,255,0.04)", border: `1px solid ${subtitles ? C.borderGlow : "rgba(255,255,255,0.07)"}`, color: subtitles ? C.cyanBright : C.textPrimary, cursor: "pointer", width: 40, height: 40, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: F_BODY, fontWeight: 700, flexShrink: 0, transition: "all 0.15s" }}>CC</button>
-              )}
+              <button onClick={e => { e.stopPropagation(); setSubtitles(s => !s); }}
+                style={{ background: subtitles ? "rgba(0,200,200,0.1)" : "rgba(255,255,255,0.04)", border: `1px solid ${subtitles ? C.borderGlow : "rgba(255,255,255,0.07)"}`, color: subtitles ? C.cyanBright : C.textPrimary, cursor: "pointer", width: 40, height: 40, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontFamily: F_BODY, fontWeight: 700, flexShrink: 0, transition: "all 0.15s" }}>CC</button>
               <div ref={settingsRef} style={{ position: "relative" }}>
                 <button onClick={e => { e.stopPropagation(); setSettingsOpen(o => !o); }}
                   style={{ background: settingsOpen ? "rgba(0,200,200,0.08)" : "rgba(255,255,255,0.04)", border: `1px solid ${settingsOpen ? C.borderGlow : "rgba(255,255,255,0.07)"}`, color: settingsOpen ? C.cyanBright : C.textPrimary, cursor: "pointer", width: 40, height: 40, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
@@ -1801,8 +1974,19 @@ function VideoPlayer({ video, allVideos, onClose }) {
         </div>
       </div>
 
+      {/* ── DESKTOP SIDE PANEL — with visible styled scrollbar ── */}
       {w > 1024 && (
-        <div className="side-panel" style={{ width: 288, background: "rgba(2,3,20,0.99)", borderLeft: `1px solid ${C.border}`, overflowY: "auto", flexShrink: 0, padding: "22px 0" }}>
+        <div
+          className="side-panel-scroll"
+          style={{
+            width: 288,
+            background: "rgba(2,3,20,0.99)",
+            borderLeft: `1px solid ${C.border}`,
+            overflowY: "scroll",
+            flexShrink: 0,
+            padding: "22px 0",
+          }}
+        >
           <div style={{ padding: "0 18px 18px" }}>
             <p style={{ fontFamily: F_DISPLAY, fontStyle: "italic", fontSize: 17, fontWeight: 700, color: C.textPrimary, margin: 0 }}>More Like This</p>
             <p style={{ fontFamily: F_BODY, fontSize: 10, color: C.textFaint, margin: "4px 0 0", letterSpacing: 2, textTransform: "uppercase" }}>{currentVideo.genre}</p>
@@ -2315,7 +2499,7 @@ export default function App() {
 
     let meta = document.querySelector('meta[name="viewport"]');
     if (!meta) { meta = document.createElement("meta"); meta.name = "viewport"; document.head.appendChild(meta); }
-    meta.content = "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no";
+    meta.content = "width=device-width, initial-scale=1.0, user-scalable=yes";
   }, []);
 
   const handlePlay = useCallback(v => { setPlayingVideo(v); setDetailVideo(null); }, []);
