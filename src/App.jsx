@@ -1398,7 +1398,8 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
       }}>
 
         {/* ── BACK BUTTON ROW ── */}
-        <div style={{
+        {!fullscreen && (
+          <div style={{
           display: "flex", alignItems: "center",
           padding: "10px 14px 8px",
           background: "rgba(0,0,0,0.5)",
@@ -1423,17 +1424,20 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
             <span>Back</span>
           </button>
         </div>
+        )}
 
         {/* ── VIDEO AREA ── */}
         <div
           style={{
             position: "relative",
             width: "100%",
-            aspectRatio: "16/9",
+            aspectRatio: fullscreen ? "none" : "16/9",
             background: "#000",
             flexShrink: 0,
+            flex: fullscreen ? 1 : "unset",
           }}
-          onClick={togglePlay}
+          onClick={() => { togglePlay(); showControlsTemp(); }}
+          onTouchStart={showControlsTemp}
         >
           <video
             key={currentVideo.id}
@@ -1511,6 +1515,9 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
           padding: "8px 14px 4px",
           background: "rgba(0,0,0,0.6)",
           flexShrink: 0,
+          opacity: (controlsVisible || !playing) ? 1 : 0,
+          transition: "opacity 0.3s",
+          pointerEvents: (controlsVisible || !playing) ? "auto" : "none",
         }}>
           <span style={{ fontFamily: F_MONO, fontSize: 11, color: C.textMuted, minWidth: 36, textAlign: "right" }}>
             {fmt(currentTime)}
@@ -1565,6 +1572,9 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
           background: "rgba(0,0,0,0.5)",
           flexShrink: 0,
           gap: 6,
+          opacity: (controlsVisible || !playing) ? 1 : 0,
+          transition: "opacity 0.3s",
+          pointerEvents: (controlsVisible || !playing) ? "auto" : "none",
         }}>
           {/* Left group: -10, play/pause, +10 */}
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1628,6 +1638,7 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
             {[
               { title: "Quality", opts: ["Auto","1080p","720p","480p","360p"], val: quality, set: setQuality },
               { title: "Speed", opts: [0.5,0.75,1,1.25,1.5,2].map(s => ({ label: `${s}×`, val: s })), val: speed, set: v => { setSpeed(v); if (videoRef.current) videoRef.current.playbackRate = v; } },
+              { title: "Zoom", opts: [{label:"Fit", val:"contain"}, {label:"Fill Screen", val:"cover"}], val: zoomMode, set: setZoomMode },
             ].map(grp => (
               <div key={grp.title} style={{ marginBottom: 18 }}>
                 <p style={{ fontSize: 9, color: C.textMuted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 2, fontFamily: F_BODY }}>{grp.title}</p>
@@ -1649,7 +1660,8 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
         )}
 
         {/* ── SCROLLABLE CONTENT: metadata + up next ── */}
-        <div
+        {!fullscreen && (
+          <div
           className="mobile-upnext-scroll"
           style={{ flex: 1, overflowY: "auto", background: "#06070f" }}
         >
@@ -1784,6 +1796,7 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
             ))}
           </div>
         </div>
+        )}
       </div>
     );
   }
@@ -1934,6 +1947,7 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
                     {[
                       { title: "Quality", opts: ["Auto","1080p","720p","480p","360p"], val: quality, set: setQuality },
                       { title: "Speed", opts: [0.5,0.75,1,1.25,1.5,2].map(s => ({ label: `${s}×`, val: s })), val: speed, set: v => { setSpeed(v); if (videoRef.current) videoRef.current.playbackRate = v; } },
+                      { title: "Zoom", opts: [{label:"Fit", val:"contain"}, {label:"Fill Screen", val:"cover"}], val: zoomMode, set: setZoomMode },
                     ].map(grp => (
                       <div key={grp.title} style={{ marginBottom: 18 }}>
                         <p style={{ fontSize: 9, color: C.textMuted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 2, fontFamily: F_BODY }}>{grp.title}</p>
