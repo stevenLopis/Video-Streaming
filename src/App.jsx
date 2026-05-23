@@ -1354,12 +1354,12 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
           border: accent ? "none" : "1px solid rgba(255,255,255,0.1)",
           color: accent ? C.void : C.textPrimary,
           cursor: "pointer",
-          width: accent ? 52 : 44,
-          height: accent ? 52 : 44,
+          width: accent ? (w < 400 ? 46 : 52) : (w < 400 ? 38 : 44),
+          height: accent ? (w < 400 ? 46 : 52) : (w < 400 ? 38 : 44),
           borderRadius: accent ? 12 : 10,
           display: "flex", alignItems: "center", justifyContent: "center",
           flexShrink: 0,
-          fontSize: accent ? 18 : 15,
+          fontSize: accent ? (w < 400 ? 16 : 18) : (w < 400 ? 13 : 15),
           boxShadow: accent ? `0 4px 20px rgba(0,200,200,0.35)` : "none",
           transition: "all 0.15s",
         }}
@@ -1377,10 +1377,10 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
           border: `1px solid ${tint ? "rgba(0,200,200,0.22)" : "rgba(255,255,255,0.09)"}`,
           color: tint ? C.cyanBright : C.textMuted,
           cursor: "pointer",
-          width: 38, height: 38,
+          width: w < 400 ? 34 : 38, height: w < 400 ? 34 : 38,
           borderRadius: 9,
           display: "flex", alignItems: "center", justifyContent: "center",
-          flexShrink: 0, fontSize: 15,
+          flexShrink: 0, fontSize: w < 400 ? 13 : 15,
           transition: "all 0.15s",
         }}
       >
@@ -1492,21 +1492,18 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
             </div>
           )}
 
-          {/* Right-edge scroll indicator bars */}
-          <div style={{
-            position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
-            display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3,
-            paddingRight: 3, pointerEvents: "none",
-          }}>
-            {[C.cyanBright, C.violetBright, C.electricPale, C.cyanMid, C.violetMid].map((col, i) => (
-              <div key={i} style={{
-                width: 3, height: 16 + i * 4,
-                background: col, borderRadius: "2px 0 0 2px",
-                opacity: 0.5,
-                boxShadow: `0 0 6px ${col}`,
-              }} />
-            ))}
-          </div>
+          {/* Captions Overlay for Mobile */}
+          {subtitles && (
+            <div style={{
+              position: "absolute", bottom: 15, left: "50%", transform: "translateX(-50%)",
+              background: "rgba(0,0,0,0.85)", backdropFilter: "blur(10px)",
+              padding: "6px 18px", borderRadius: 6, fontFamily: F_BODY,
+              fontSize: 12, color: "#fff", maxWidth: "85%", textAlign: "center",
+              zIndex: 10, pointerEvents: "none", border: "1px solid rgba(255,255,255,0.1)"
+            }}>
+              Captions Enabled — Streamify Premium
+            </div>
+          )}
         </div>
 
         {/* ── PROGRESS BAR WITH TIMESTAMPS ── */}
@@ -1576,10 +1573,11 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
           transition: "opacity 0.3s",
           pointerEvents: (controlsVisible || !playing) ? "auto" : "none",
         }}>
-          {/* Left group: -10, play/pause, +10 */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Left group: Prev, -10, play/pause, +10, Next */}
+          <div style={{ display: "flex", alignItems: "center", gap: w < 400 ? 4 : 8 }}>
+            {mobileSmallBtn(handlePrev, <SVGIcon path={ICONS.prev} size={w < 400 ? 14 : 16} />)}
             {mobileCtrlBtn(() => seek(-10),
-              <span style={{ fontFamily: F_MONO, fontSize: 12, fontWeight: 700 }}>-10</span>
+              <span style={{ fontFamily: F_MONO, fontSize: w < 400 ? 10 : 12, fontWeight: 700 }}>-10</span>
             )}
             {mobileCtrlBtn(togglePlay,
               playing
@@ -1588,12 +1586,13 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
               true
             )}
             {mobileCtrlBtn(() => seek(10),
-              <span style={{ fontFamily: F_MONO, fontSize: 12, fontWeight: 700 }}>+10</span>
+              <span style={{ fontFamily: F_MONO, fontSize: w < 400 ? 10 : 12, fontWeight: 700 }}>+10</span>
             )}
+            {mobileSmallBtn(handleNext, <SVGIcon path={ICONS.next} size={w < 400 ? 14 : 16} />)}
           </div>
 
-          {/* Right group: ⚙ ⛶ ✕ */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Right group: ⚙, ⛶, ✕ */}
+          <div style={{ display: "flex", alignItems: "center", gap: w < 400 ? 4 : 6 }}>
             {mobileSmallBtn(
               () => setSettingsOpen(o => !o),
               <SVGIcon path={ICONS.settings} size={17} />,
@@ -1611,7 +1610,7 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
                 border: "1px solid rgba(124,58,237,0.28)",
                 color: C.violetBright,
                 cursor: "pointer",
-                width: 38, height: 38,
+                width: w < 400 ? 34 : 38, height: w < 400 ? 34 : 38,
                 borderRadius: 9,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 16, flexShrink: 0,
@@ -1639,6 +1638,7 @@ function VideoPlayer({ video, allVideos, onClose, onDetail }) {
               { title: "Quality", opts: ["Auto","1080p","720p","480p","360p"], val: quality, set: setQuality },
               { title: "Speed", opts: [0.5,0.75,1,1.25,1.5,2].map(s => ({ label: `${s}×`, val: s })), val: speed, set: v => { setSpeed(v); if (videoRef.current) videoRef.current.playbackRate = v; } },
               { title: "Zoom", opts: [{label:"Fit", val:"contain"}, {label:"Fill Screen", val:"cover"}], val: zoomMode, set: setZoomMode },
+              { title: "Captions", opts: [{label: "OFF", val: false}, {label: "ON", val: true}], val: subtitles, set: setSubtitles },
             ].map(grp => (
               <div key={grp.title} style={{ marginBottom: 18 }}>
                 <p style={{ fontSize: 9, color: C.textMuted, margin: "0 0 10px", textTransform: "uppercase", letterSpacing: 2, fontFamily: F_BODY }}>{grp.title}</p>
